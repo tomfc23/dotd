@@ -1,0 +1,35 @@
+name: DOTD Data Collector
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"  # Every 30 minutes UTC
+  workflow_dispatch:
+
+jobs:
+  run-dotd-collector:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests pytz
+
+      - name: Run DOTD Collector
+        run: python main.py
+
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add dotd_data/dotd_all_snapshots.json
+          git commit -m "Update DOTD snapshots [skip ci]" || echo "No changes to commit"
+          git push
