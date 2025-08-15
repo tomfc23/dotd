@@ -3,7 +3,7 @@ name: DOTD Data Collector
 on:
   schedule:
     # Run every 30 minutes
-    - cron: '*/30 * * * *'
+    - cron: '*/5 * * * *'
   workflow_dispatch: # Allow manual triggering
 
 jobs:
