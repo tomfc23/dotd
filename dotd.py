@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
 """
-DOTD (Deal of the Day) Data Collector - Continuous Loop Version
-Fetches betting data from Real.vg API every 30 minutes continuously
+DOTD (Deal of the Day) Data Collector - Single Snapshot Version
+Fetches betting data from Real.vg API once and saves it
 """
 
 import requests
 import json
-import time
-import signal
-import sys
 from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Any, Optional
 import os
@@ -19,17 +16,7 @@ class DOTDCollector:
         self.api_url = api_url
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(exist_ok=True)
-        self.running = True
         
-        # Set up signal handler for graceful shutdown
-        signal.signal(signal.SIGINT, self._signal_handler)
-        signal.signal(signal.SIGTERM, self._signal_handler)
-        
-    def _signal_handler(self, signum, frame):
-        """Handle shutdown signals gracefully"""
-        print(f"\n⚠️  Received signal {signum}, shutting down gracefully...")
-        self.running = False
-    
     def _save_data(self, snapshot_data: Dict[str, Any]):
         """Save snapshot to single master file with all snapshots"""
         try:
@@ -216,7 +203,7 @@ class DOTDCollector:
             'teams': teams  # teams is now sorted by vote count (highest to lowest) with proper ranks
         }
     
-    def collect_single_snapshot(self) -> bool:
+    def collect_snapshot(self) -> bool:
         """Collect a single data snapshot"""
         current_time = datetime.now()
         print(f"\n[{current_time.strftime('%Y-%m-%d %H:%M:%S')}] Collecting snapshot...")
@@ -248,69 +235,29 @@ class DOTDCollector:
                 print(f"   {i+1}. Rank {team['rank']}: {team['team_identifier']} ({team['vote_count']} votes, {team['current_vote_percentage']:.1f}%)")
         
         return True
-    
-    def run_continuous_collection(self, interval_minutes: int = 30):
-        """
-        Run continuous data collection every interval_minutes
-        
-        Args:
-            interval_minutes: Collection interval in minutes (default: 30)
-        """
-        print(f"🕐 DOTD Collector Starting - Continuous Mode")
-        print(f"⏱️  Collection interval: {interval_minutes} minutes")
-        print(f"📁 Output directory: {self.output_dir}")
-        print(f"🔗 API URL: {self.api_url}")
-        print(f"⚠️  Press Ctrl+C to stop gracefully\n")
-        
-        collections_completed = 0
-        
-        # Run initial collection immediately
-        print(f"🚀 Running initial collection...")
-        success = self.collect_single_snapshot()
-        if success:
-            collections_completed += 1
-        
-        while self.running:
-            # Calculate next run time
-            next_run = datetime.now() + timedelta(minutes=interval_minutes)
-            wait_seconds = interval_minutes * 60
-            
-            print(f"⏳ Next collection at {next_run.strftime('%H:%M:%S')} (waiting {wait_seconds} seconds)")
-            
-            # Sleep in small intervals to allow for graceful shutdown
-            while wait_seconds > 0 and self.running:
-                sleep_time = min(5, wait_seconds)  # Check every 5 seconds
-                time.sleep(sleep_time)
-                wait_seconds -= sleep_time
-            
-            # If we're still running, collect data
-            if self.running:
-                success = self.collect_single_snapshot()
-                if success:
-                    collections_completed += 1
-        
-        print(f"\n🎯 Collection session complete!")
-        print(f"📊 Total snapshots collected: {collections_completed}")
-        print(f"📁 Data saved in: {self.output_dir}")
 
 
 def main():
     # Configuration - EASILY ADJUSTABLE
     API_URL = "https://api.real.vg/polls/270619"
     OUTPUT_DIR = "dotd_data"
-    INTERVAL_MINUTES = 30  # Collection interval
     
-    # Create collector and run
+    # Create collector and run single collection
     collector = DOTDCollector(API_URL, OUTPUT_DIR)
     
+    print(f"🕐 DOTD Collector - Single Snapshot Mode")
+    print(f"📁 Output directory: {OUTPUT_DIR}")
+    print(f"🔗 API URL: {API_URL}\n")
+    
     try:
-        collector.run_continuous_collection(interval_minutes=INTERVAL_MINUTES)
-    except KeyboardInterrupt:
-        print("\n👋 Gracefully shutting down...")
+        success = collector.collect_snapshot()
+        if success:
+            print(f"\n🎯 Collection complete!")
+            print(f"📁 Data saved in: {OUTPUT_DIR}")
+        else:
+            print(f"\n❌ Collection failed!")
     except Exception as e:
         print(f"\n❌ Unexpected error: {e}")
-    
-    print("✅ Collector stopped.")
 
 
 if __name__ == "__main__":
