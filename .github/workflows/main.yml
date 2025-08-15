@@ -2,38 +2,50 @@ name: DOTD Data Collector
 
 on:
   schedule:
-    - cron: "*/30 * * * *"  # Every 30 minutes UTC
-  workflow_dispatch:
+    # Run every 30 minutes
+    - cron: '*/30 * * * *'
+  workflow_dispatch: # Allow manual triggering
 
 jobs:
-  run-dotd-collector:
+  collect-data:
     runs-on: ubuntu-latest
-
+    
+    permissions:
+      contents: write # Required to commit and push changes
+    
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-        with:
-          persist-credentials: true
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install requests pytz
-
-      - name: Run DOTD Collector
-        run: python main.py
-
-      - name: Commit and push changes
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add dotd_data/dotd_all_snapshots.json
-          git commit -m "Update DOTD snapshots [skip ci]" || echo "No changes to commit"
-          git push https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0 # Fetch full history for proper git operations
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install requests pytz
+    
+    - name: Create data directory
+      run: mkdir -p dotd_data
+    
+    - name: Run DOTD collector
+      run: python main.py
+    
+    - name: Configure git
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+    
+    - name: Commit and push changes
+      run: |
+        git add dotd_data/
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+        else
+          git commit -m "Update DOTD data - $(date -u +"%Y-%m-%d %H:%M UTC")"
+          git push
+        fi
