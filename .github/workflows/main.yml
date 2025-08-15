@@ -2,7 +2,7 @@ name: DOTD Data Collector
 
 on:
   schedule:
-    # Run every 30 minutes
+    # Run every 5 minutes
     - cron: '*/5 * * * *'
   workflow_dispatch: # Allow manual triggering
 
@@ -18,7 +18,8 @@ jobs:
       uses: actions/checkout@v4
       with:
         fetch-depth: 0 # Fetch full history for proper git operations
-    
+        persist-credentials: false # We'll use GITHUB_TOKEN explicitly
+
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
@@ -37,15 +38,13 @@ jobs:
     
     - name: Configure git
       run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
     
     - name: Commit and push changes
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         git add dotd_data/
-        if git diff --staged --quiet; then
-          echo "No changes to commit"
-        else
-          git commit -m "Update DOTD data - $(date -u +"%Y-%m-%d %H:%M UTC")"
-          git push
-        fi
+        git commit -m "Update DOTD data - $(date -u +"%Y-%m-%d %H:%M UTC")" || echo "No changes to commit"
+        git push https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
